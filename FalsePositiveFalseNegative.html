@@ -1,0 +1,306 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Page Title</title>
+    <style> 
+      input[type=text] {
+        border: 3px solid #888888;
+        text-align:right;
+      }
+
+      input[type=text]:focus {
+        border: 3px solid #000000;
+      }
+    </style>
+  </head>
+<body>
+
+When testing for the presence of a disease, the results obtained are often not 100% reliable. 
+In this article we explain false positives and false negatives in test results. 
+The graphics are dynamic, if you change the input numbers, then they'll update. <br/>
+
+Let's start with the prevalence of disease, this is the proportion of positive cases in the population.<br/>
+Disease prevalence input: 
+<input  id="prevalence" value="20.0" onchange="refreshFPFN()" type="text"  size=10 style="background-color:rgb(250,160,160);" />%
+<br/>
+
+<br/>
+<canvas id="prevalenceCanvas" > </canvas> <br/>
+
+<i style="font-size:10px;">
+  <b style="background-color:rgb(250,160,160);">Light red</b>  
+  shows the proportion of the population that have the disease, i.e. are positive.<br/>
+  <b style="background-color:rgb(100,160,250);">Light blue</b> 
+  shows the proportion of the population that don't have the disease, i.e. are negative.<br/>
+</i>  
+<br/>
+<br/>
+The false negative rate is the proportion of the positive cases that are incorrectly deemed to be negative.<br/>
+False negative input:
+<input  id="falseNeg" value="15.0" onchange="refreshFPFN()" type="text"  size=10 style="background-color:rgb(220,160,0);" />%
+<br/>
+<br/>
+<canvas id="falseNegCanvas"> </canvas> <br/>
+<i style="font-size:10px;">
+  <b style="background-color:rgb(220,80,80);">Dull red</b> 
+  shows the true positives: the proportion of the population that are positive and get positive test results.<br/>
+  <b style="background-color:rgb(220,160,0);">Orange</b> 
+  shows the false negatives: the population that are positive but get negative test results.<br/>
+</i>  
+<br/>
+<br/>
+The false positive rate is the proportion of the negative cases that are incorrectly deemed to be positive.<br/>
+False positive input:
+<input  id="falsePos" value="10.0" onchange="refreshFPFN()" type="text"  size=10 style="background-color:rgb(255,255,0);" />%
+<br/>
+<br/>
+<canvas id="falsePosCanvas" > </canvas>  <br/>
+<i style="font-size:10px;">
+  <b style="background-color:rgb(255,255,0);">Yellow</b> shows the false positives: the population that are negative but get positive test results.<br/>
+  <b style="background-color:rgb(80,80,220);color:white">Dull blue</b> shows the true negatives: the proportion of the population that are negative and get negative test results.<br/>
+</i>  
+<br/>
+<br/>
+One challenge when considering an individual positive test result is that it is not clear whether it is a true positive or a false positive. We can look at the likelihood of each:
+<br/>
+<canvas id="positiveCanvas"> </canvas>  <br/>
+<i style="font-size:10px;">
+  <b style="background-color:rgb(220,80,80);">Dull red</b> 
+  shows the true positives: the proportion of the population that are positive and get positive test results.<br/>
+  <b style="background-color:rgb(255,255,0);">Yellow</b> 
+  shows the false positives: the population that are negative but get positive test results.<br/>
+</i>  
+<br/>
+Using the values that were input above for prevalence, false positives and false negative, <br/>
+we find that of the positives: <br/>
+<table>
+  <tr><td>True positives:  </td> <td id="true-pos-over-total-pos">  </td> </tr>
+  <tr><td>False positives: </td> <td id="false-pos-over-total-pos"> </td> </tr>
+</table>  
+When the prevalence is low, it is common to have a situation where there are more false positives than true positives. You can try this out for yourself by reducing the prevalence number above.
+
+<br/>
+<br/>
+
+<script> 
+  
+  ///////////////////////////////////////////////////////////////////////
+  // Author: Philip Kinlen, Dec 2021
+  function refreshFPFN() {
+
+    var configDataFPFN      = getConfigDataFPFN();
+    var userDataFPFN        = getUserDataFPFN(configDataFPFN);
+     
+    redrawGraphicsFPFN(configDataFPFN, userDataFPFN);
+  }
+  ///////////////////////////////////////////////////////////////////////
+  function getConfigDataFPFN(){
+
+    var configDataFPFN =  { 
+                         fullWidth     : getWidth(), 
+                         fullHeight    : 40,
+      
+                         backgroundRGB : "rgb(220, 220, 220)",  // light grey
+
+                         positiveRGB   : "rgb(250, 160, 160)",  // light red
+                         negativeRGB   : "rgb(100, 160, 250)",  // light blue
+      
+                         truePosRGB    : "rgb(220,  80,  80)",  // dull red
+                         falseNegRGB   : "rgb(220, 160,   0)",  // orange 
+
+                         falsePosRGB   : "rgb(255, 255,   0)",  // yellow 
+                         trueNegRGB    : "rgb( 80,  80, 220)",  // dull blue
+ 
+                         epsilon      : 1e-8   // a small number used to help avoid division by zero errors
+                      };
+
+    return configDataFPFN;
+  }
+  ///////////////////////////////////////////////////////////////////////
+  function getWidth(){
+        
+      var scrollWidth = document.documentElement.offsetWidth;
+      if ( scrollWidth < 1)
+          return 400;
+      else if ( scrollWidth > 500)
+          return 400;
+      else  
+          return scrollWidth * 0.8;
+  }  
+  ///////////////////////////////////////////////////////////////////////
+  function getUserDataFPFN(configData) {
+
+    var  prevalenceVal = text2NumFPFN(document.getElementById("prevalence").value, configData) * 0.01;
+    var  falseNegVal   = text2NumFPFN(document.getElementById("falseNeg"  ).value, configData) * 0.01;
+    var  falsePosVal   = text2NumFPFN(document.getElementById("falsePos"  ).value, configData) * 0.01;
+
+    var userData       = { prevalence : prevalenceVal,
+                           falseNeg   : falseNegVal,
+                           falsePos   : falsePosVal
+                         };
+    
+    return userData;     
+  }
+
+  ///////////////////////////////////////////////////////////////////////
+  function redrawGraphicsFPFN(configDataFPFN, userDataFPFN){
+
+      redrawPrevalenceGraphic(configDataFPFN, userDataFPFN);
+      redrawFalseNegGraphic  (configDataFPFN, userDataFPFN);
+      redrawFalsePosGraphic  (configDataFPFN, userDataFPFN);
+      redrawPositiveGraphic  (configDataFPFN, userDataFPFN);
+  }
+  ///////////////////////////////////////////////////////////////////////
+  function redrawFalseNegGraphic(configDataFPFN, userDataFPFN){
+
+      var   canvas  = document.getElementById("falseNegCanvas");
+
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, configDataFPFN.fullWidth, configDataFPFN.fullHeight);
+
+      canvas.width  = configDataFPFN.fullWidth;
+      canvas.height = configDataFPFN.fullHeight;
+
+      var trueBoundary     = configDataFPFN.fullWidth * userDataFPFN.prevalence;
+      var falseNegBoundary = trueBoundary * ( 1.0 - userDataFPFN.falseNeg);
+
+      // background Rect   
+      context.fillStyle = configDataFPFN.backgroundRGB;    
+      context.fillRect (0, 0, configDataFPFN.fullWidth, configDataFPFN.fullHeight);
+
+      // True Positive Rectangle
+      context.fillStyle = configDataFPFN.truePosRGB;
+      context.fillRect (0, 0, falseNegBoundary, configDataFPFN.fullHeight);
+
+      // False Negative Rectangle
+      context.fillStyle = configDataFPFN.falseNegRGB;
+      context.fillRect (falseNegBoundary, 0, trueBoundary - falseNegBoundary, configDataFPFN.fullHeight);
+
+            
+      console.log("redrawn false neg");
+  
+    }  
+  ///////////////////////////////////////////////////////////////////////
+  function redrawFalsePosGraphic(configDataFPFN, userDataFPFN){
+
+      var   canvas      = document.getElementById("falsePosCanvas");
+
+      const context     = canvas.getContext('2d');
+      context.clearRect(0, 0, configDataFPFN.fullWidth, configDataFPFN.fullHeight);
+
+      canvas.width      = configDataFPFN.fullWidth;
+      canvas.height     = configDataFPFN.fullHeight;
+
+      var trueBoundary  = configDataFPFN.fullWidth * userDataFPFN.prevalence;      
+      var falseNegWidth = configDataFPFN.fullWidth * ( 1.0 - userDataFPFN.prevalence) * userDataFPFN.falsePos;
+
+      // Background Rectangle   
+      context.fillStyle = configDataFPFN.backgroundRGB;    
+      context.fillRect (0, 0, configDataFPFN.fullWidth, configDataFPFN.fullHeight);
+
+      // False Positive Rectangle
+      context.fillStyle = configDataFPFN.falsePosRGB;
+      context.fillRect (trueBoundary, 0, falseNegWidth, configDataFPFN.fullHeight);
+
+      // True Negative Rectangle
+      context.fillStyle = configDataFPFN.trueNegRGB;
+      context.fillRect (trueBoundary + falseNegWidth, 0, configDataFPFN.fullWidth - trueBoundary - falseNegWidth, configDataFPFN.fullHeight);
+           
+      console.log("redrawn false pos");  
+    }  
+    ///////////////////////////////////////////////////////////////////////
+    function redrawPrevalenceGraphic(configDataFPFN, userDataFPFN){
+
+      var   canvas  = document.getElementById("prevalenceCanvas");
+
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, configDataFPFN.fullWidth, configDataFPFN.fullHeight);
+
+      canvas.width  = configDataFPFN.fullWidth;
+      canvas.height = configDataFPFN.fullHeight;
+
+      var boundary = userDataFPFN.prevalence * configDataFPFN.fullWidth;
+
+      // True Rectangle     
+      context.fillStyle = configDataFPFN.positiveRGB;    
+      context.fillRect (0, 0, boundary, configDataFPFN.fullHeight);
+
+      // False Rectangle
+      context.fillStyle = configDataFPFN.negativeRGB;
+      context.fillRect (boundary, 0, configDataFPFN.fullWidth, configDataFPFN.fullWidth);
+
+            
+      console.log("redrawn prevalence");
+  
+    }  
+    ///////////////////////////////////////////////////////////////////////
+    function redrawPositiveGraphic(configDataFPFN, userDataFPFN){
+
+      var   canvas  = document.getElementById("positiveCanvas");
+
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, configDataFPFN.fullWidth, configDataFPFN.fullHeight);
+
+      canvas.width  = configDataFPFN.fullWidth;
+      canvas.height = configDataFPFN.fullHeight;
+
+      var trueBoundary  = configDataFPFN.fullWidth * userDataFPFN.prevalence;      
+      var falseNegBoundary = trueBoundary * ( 1.0 - userDataFPFN.falseNeg);
+      var falseNegWidth = configDataFPFN.fullWidth * ( 1.0 - userDataFPFN.prevalence) * userDataFPFN.falsePos;
+
+      // Background Rectangle   
+      context.fillStyle = configDataFPFN.backgroundRGB;    
+      context.fillRect (0, 0, configDataFPFN.fullWidth, configDataFPFN.fullHeight);
+
+      // True Positive Rectangle
+      context.fillStyle = configDataFPFN.truePosRGB;
+      context.fillRect (0, 0, falseNegBoundary, configDataFPFN.fullHeight);
+
+      // False Positive Rectangle
+      context.fillStyle = configDataFPFN.falsePosRGB;
+      context.fillRect (trueBoundary, 0, falseNegWidth, configDataFPFN.fullHeight);
+
+      var truePos  = userDataFPFN.prevalence * ( 1.0 - userDataFPFN.falseNeg);
+      var falsePos = (1.0 - userDataFPFN.prevalence) * userDataFPFN.falsePos;
+      var totalPos = truePos + falsePos;
+    
+      var truePosOverTotalPos;
+    
+      if (totalPos > 0){
+        truePosOverTotalPos = truePos / totalPos;
+      } else {
+        truePosOverTotalPos = 1.0;     
+      }
+    
+      document.getElementById("true-pos-over-total-pos" ).innerHTML = num2StrWithCommasFPFN(100.0 *         truePosOverTotalPos , 2) + "%";
+      document.getElementById("false-pos-over-total-pos").innerHTML = num2StrWithCommasFPFN(100.0 * ( 1.0 - truePosOverTotalPos), 2) + "%";
+           
+      console.log("redrawn pos");  
+    }  
+    /////////////////////////////////////////////////////////////////////////////
+    function text2NumFPFN(str, configDataFPFN){
+          console.log("trying to convert str " + str + " to a number");
+          var ret = Number(str.replace(/\,/g,''));
+                
+          return ret;        
+    } 
+    /////////////////////////////////////////////////////////////////////////////
+    function num2StrWithCommasFPFN(x, decimals) {
+         return x.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+    /////////////////////////////////////////////////////////////////////////////
+    refreshFPFN();
+</script>
+
+<!-- 
+  TODO:
+		Could add note for precision and recal.
+              Precision: of the items with positive test results, what proportion are genuinely positive?
+              Recal: of the positives in the population, what proportion are identified as being positive.
+		Could add note for sensitivity and specificity.
+        Could add some user help when input are either non numeric or outside the range 0 to 100%.  
+  -->
+
+  </body>
+</html>
